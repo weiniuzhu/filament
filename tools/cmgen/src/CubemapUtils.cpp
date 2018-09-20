@@ -86,6 +86,34 @@ void CubemapUtils::equirectangularToCubemap(Cubemap& dst, const Image& src) {
     });
 }
 
+void CubemapUtils::cubemapToEquirectangular(Image& dst, const Cubemap& src) {
+    // TODO: multithread
+    const double w = dst.getWidth();
+    const double h = dst.getHeight();
+    for (size_t j = 0; j < h; j++) {
+        for (size_t i = 0; i < w; i++) {
+            float3 c = 0;
+            const size_t numSamples = 16; // TODO: how to chose numsamples
+            for (size_t sample = 0; sample < numSamples; sample++) {
+                const double2 u = hammersley(uint32_t(sample), 1.0f / numSamples);
+                double x = 2.0 * (i + u.x) / w - 1.0;
+                double y = 1.0 - 2.0 * (j + u.y) / h;
+                double theta = x * M_PI;
+                double phi = y * M_PI * 0.5;
+                //double phi = std::asin(y);
+                double3 s = {
+                        std::cos(phi) * std::cos(theta),
+                        std::sin(phi),
+                        std::cos(phi) * std::sin(theta) };
+
+                c += src.filterAt(s);
+            }
+            Cubemap::writeAt(dst.getPixelRef(i, j), c * (1.0 / numSamples));
+        }
+    }
+}
+
+
 void CubemapUtils::downsampleCubemapLevelBoxFilter(Cubemap& dst, const Cubemap& src) {
     size_t scale = src.getDimensions() / dst.getDimensions();
     process<EmptyState>(dst,
